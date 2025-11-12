@@ -1,4 +1,4 @@
-name: Python tests
+name: Python tests (with build deps)
 
 on:
   push:
@@ -20,12 +20,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Upgrade pip and install dependencies
+      - name: Install apt packages required for building cryptography
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev pkg-config
+
+      - name: Install Rust toolchain (for cryptography builds)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Upgrade pip & install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install --only-binary=:all: cryptography pytest
+          python -m pip install -r requirements.txt
 
-      - name: Verify installation
+      - name: Verify cryptography and run tests
         run: |
-          python -c "import cryptography; print('Cryptography OK:', cryptography.__version__)"
+          python -c "import cryptography; print('cryptography', cryptography.__version__)"
           python -m pytest -q

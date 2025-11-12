@@ -100,6 +100,46 @@ def cmd_generate(args):
     save_wrapped_master_key(MASTER_KEY_ENC_PATH, wrapped)
     print("Generated and wrapped master key ->", MASTER_KEY_ENC_PATH)
 
+def cmd_change_password(args):
+    """
+    Change the password that protects the wrapped master key.
+    This unwraps the master key using the current password, then re-wraps it with the new password.
+    """
+    if not MASTER_KEY_ENC_PATH.exists():
+        print("No wrapped master key found. Run `generate-master-key` first.")
+        return
+
+    # Get current password and try to unwrap
+    old_password = getpass.getpass("Enter current password to unwrap the master key: ")
+    wrapped = load_wrapped_master_key(MASTER_KEY_ENC_PATH)
+    try:
+        master_key = unwrap_master_key(wrapped, old_password)
+    except Exception as e:
+        print("Failed to unwrap master key with the provided current password:", str(e))
+        return
+
+    # Get new password (confirm)
+    new_password = getpass.getpass("Enter NEW password to protect the master key: ")
+    if not new_password:
+        print("Empty password is not allowed.")
+        return
+    new_password2 = getpass.getpass("Confirm NEW password: ")
+    if new_password != new_password2:
+        print("New passwords do not match. Aborting.")
+        return
+
+    # Re-wrap master key and write atomically
+    new_wrapped = wrap_master_key(master_key, new_password)
+    tmp_path = MASTER_KEY_ENC_PATH.with_suffix(".enc.tmp")
+    tmp_path.write_bytes(new_wrapped)
+    try:
+        tmp_path.chmod(0o600)
+    except Exception:
+        pass
+    tmp_path.replace(MASTER_KEY_ENC_PATH)  # atomic on most OSes
+    print("Master key re-wrapped with new password ->", MASTER_KEY_ENC_PATH)
+
+
 def cmd_encrypt(args):
     if not MASTER_KEY_ENC_PATH.exists():
         print("No wrapped master key found. Run `generate-master-key` first.")
@@ -165,6 +205,9 @@ def build_parser():
     d.add_argument("input", help="Encrypted input file")
     d.add_argument("output", nargs="?", help="Output decrypted file (optional)")
     d.set_defaults(func=cmd_decrypt)
+
+    c = sp.add_parser("change-password", help="Change password used to protect the wrapped master key")
+    c.set_defaults(func=cmd_change_password)
 
     return p
 

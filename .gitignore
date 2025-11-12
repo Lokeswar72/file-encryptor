@@ -1,0 +1,9 @@
+# Keys and encrypted files
+keys/
+*.enc
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.vscode/
